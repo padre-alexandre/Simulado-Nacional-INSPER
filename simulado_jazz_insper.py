@@ -26,8 +26,8 @@ scope = ['https://spreadsheets.google.com/feeds','https://www.googleapis.com/aut
 creds = ServiceAccountCredentials.from_json_keyfile_name('client_secret.json', scope)
 client = gspread.authorize(creds)
 
-#sheet = client.open('Banco de Dados - Relatório Simulado Nacional').sheet1          # Enquanto estiver rodando na nuvem
-sheet = client.open('Banco de Dados - Relatório Simulado Nacional - Teste').sheet1   # Enquanto estiver rodando no local
+sheet = client.open('Banco de Dados - Relatório Simulado Nacional').sheet1          # Enquanto estiver rodando na nuvem
+#sheet = client.open('Banco de Dados - Relatório Simulado Nacional - Teste').sheet1   # Enquanto estiver rodando no local
 
 row0 = ['Data e Hora', 'Turma','Nome','Login']
 
@@ -164,13 +164,17 @@ def leitura_bases_dados():
 
 login_aluno = st.text_input('Digite o seu login', '')
 
-@st.cache(suppress_st_warning=True)
+#@st.cache(suppress_st_warning=True)
 def fase_1(login_aluno, turma_eng, turma_cien, resultados_gerais3):
     #resultados_gerais3 = leitura_bases_dados()
     resultados_gerais3.to_csv('resultado_compilado.csv')
 
     nome_aluno3 = resultados_gerais3[resultados_gerais3['Login do aluno(a)'] == login_aluno]['Nome do aluno(a)'].reset_index()
     turma_aluno = resultados_gerais3[resultados_gerais3['Login do aluno(a)'] == login_aluno]['Turma'].reset_index() 
+
+    row = [str(datetime.today()),turma_aluno['Turma'][0],nome_aluno3['Nome do aluno(a)'][0],login_aluno]
+    index = 2
+    sheet.insert_row(row, index)
 
     resultados_gerais_aluno = resultados_gerais3[resultados_gerais3['Nome do aluno(a)'] == nome_aluno3['Nome do aluno(a)'][0]].reset_index()
     resultados_gerais_aluno.rename(columns = {'index':'Classificação'}, inplace = True)
@@ -208,7 +212,7 @@ def fase_1(login_aluno, turma_eng, turma_cien, resultados_gerais3):
     aux2 = resultados_gerais4[resultados_gerais4['Turma'] == turma_cien]
     numero_eng_cien = len(aux['Nome do aluno(a)']) + len(aux2['Nome do aluno(a)'])
 
-    return resultados_gerais_aluno, resultados_gerais5, numero_candidatos, resultados_gerais4, alunos_fizeram, numero_eng_cien, turma_aluno, resultados_gerais_media_tempo_str, hours_aluno
+    return resultados_gerais_aluno, resultados_gerais5, numero_candidatos, resultados_gerais4, alunos_fizeram, numero_eng_cien, turma_aluno, resultados_gerais_media_tempo_str, hours_aluno, nome_aluno3
     
 def fase_1_show(resultados_gerais_aluno, resultados_gerais5, numero_candidatos, resultados_gerais4, resultados_gerais_media_tempo_str, hours_aluno):
     
@@ -519,7 +523,7 @@ def fase_1_show(resultados_gerais_aluno, resultados_gerais5, numero_candidatos, 
         with col5:
             st.write("")
 
-@st.cache()
+#@st.cache()
 def resultados_gerais_disciplina(base, alunos_fizeram):
 
     base_alunos_fizeram = base[base['Nome do aluno(a)'].isin(alunos_fizeram['Nome do aluno(a)'])].reset_index(drop = True)
@@ -535,8 +539,10 @@ def resultados_gerais_disciplina(base, alunos_fizeram):
     resultados_gerais_disciplina3['Nota na questão'] = 1000*resultados_gerais_disciplina3['Nota na questão']/resultados_gerais_disciplina3['Valor da questão']
     
     resultados_gerais_disciplina3_aux = resultados_gerais_disciplina3.drop(columns = ['Turma','Login do aluno(a)','Nome do aluno(a)'])
-    
-    resultados_gerais_disciplina4 = resultados_gerais_disciplina3_aux.groupby('Disciplina').mean().reset_index()
+    #tipos = resultados_gerais_disciplina3_aux.dtypes
+
+    resultados_gerais_disciplina4 = resultados_gerais_disciplina3_aux.groupby(['Disciplina']).mean(['Tempo na questão','Acerto','Nota na questão']).reset_index()
+
     resultados_gerais_disciplina5 = resultados_gerais_disciplina4.sort_values(by = 'Disciplina', ascending = False)
     
     ### Resultados do aluno por disciplina
@@ -3083,9 +3089,9 @@ def red_show2(redacao_tabela3):
     st.markdown(html_br(), unsafe_allow_html=True)
 
     if redacao_tabela3['Resultado Individual decimal'].sum() > 0:
-        st.image("redacao_"+login_aluno+".png", caption=f"Redação", use_column_width=True, align='center')
+        st.image("redacao_"+login_aluno+".png", caption=f"Redação", use_column_width=True)
 
-def fotos_questao(turma_aluno, turma_eng, turma_cien):
+def fotos_questao(turma_aluno, turma_eng, turma_cien,nome_aluno3):
 
     html_subtitle = ""
     @st.cache
@@ -3105,31 +3111,35 @@ def fotos_questao(turma_aluno, turma_eng, turma_cien):
     
     st.markdown(html_subtitle(), unsafe_allow_html=True)
 
-    numeros_e_imagens = {i: f"Questão {str(i).zfill(2)}.png" for i in range(1, 73)}
+    numeros_e_imagens = {i: f"Questão {str(i).zfill(2)}.png" for i in range(1, 98)}
 
     selecionado = ""
     num_selecionado = ""
     # Inicializa a grade
     botoes_por_linha = 24
-    num_linhas = len(numeros_e_imagens) // botoes_por_linha
+    num_linhas = (len(numeros_e_imagens) - 25) // botoes_por_linha
     # Exibe os botões em colunas
-    for numero in range(1, len(numeros_e_imagens) + 1, botoes_por_linha):
+    for numero in range(1, len(numeros_e_imagens) - 25 + 1, botoes_por_linha):
         colunas = st.columns(botoes_por_linha)
         for i in range(botoes_por_linha):
             coluna = colunas[i]
-            if numero + i <= len(numeros_e_imagens):
+            if numero + i <= (len(numeros_e_imagens) - 25):
                 if coluna.button(f"{str(numero + i).zfill(2)}"):
                     selecionado = numeros_e_imagens[numero + i]
                     num_selecionado = numero
                     i_selecionado = i
 
     if (selecionado != "" and num_selecionado != ""):
+        row = [str(datetime.today()),turma_aluno['Turma'][0],nome_aluno3['Nome do aluno(a)'][0],login_aluno,num_selecionado + i_selecionado]
+        index = 2
+        sheet.insert_row(row, index)
         if (turma_aluno['Turma'][0] != turma_eng and turma_aluno['Turma'][0] != turma_cien):
 
             st.image(selecionado, caption=f"Questão {num_selecionado + i_selecionado}", use_column_width=True)
         else:
             if (num_selecionado + i_selecionado) < 25:
-                st.image(selecionado, caption=f"Questão {num_selecionado + i_selecionado + 73}", use_column_width=True)
+                selecionado = numeros_e_imagens[num_selecionado + i_selecionado + 73]
+            st.image(selecionado, caption=f"Questão {num_selecionado + i_selecionado}", use_column_width=True)
 
 def detalhamento(base):
         
@@ -3169,13 +3179,13 @@ def detalhamento(base):
     tabela_detalhes_media2 = tabela_detalhes_media.drop(columns = ['Nota na questão','Valor da questão'])
 
     tabela_detalhes_aluno3 = pd.merge(tabela_detalhes_aluno2, tabela_detalhes_media2, on = 'Número da questão', how = 'inner')
-        
+ 
     if turma_aluno['Turma'][0] == turma_eng or turma_aluno['Turma'][0] == turma_cien:
         for i in range(len(tabela_detalhes_aluno3['Número da questão'])):
-            if tabela_detalhes_aluno3['Número da questão'][i] < 73:
-                tabela_detalhes_aluno3['Número da questão'][i] = tabela_detalhes_aluno3['Número da questão'][i] - 24
             if tabela_detalhes_aluno3['Número da questão'][i] > 73:
-                tabela_detalhes_aluno3['Número da questão'][i] = tabela_detalhes_aluno3['Número da questão'][i] - 25
+                tabela_detalhes_aluno3['Número da questão'][i] = tabela_detalhes_aluno3['Número da questão'][i] - 73
+            #if tabela_detalhes_aluno3['Número da questão'][i] > 73:
+            #    tabela_detalhes_aluno3['Número da questão'][i] = tabela_detalhes_aluno3['Número da questão'][i] - 25
 
         #for i in range(len(tabela_detalhes_aluno3['Número da questão'])):
             #if tabela_detalhes_aluno3['Número da questão'][i] > 90:
@@ -4208,9 +4218,9 @@ def fase_1_2(resultados_gerais5, base_resultados_2fase, base_redacao_disciplina2
     
     resultado_finalaux = resultado_final[resultado_final['Nota Final 2º fase'] > 0]
 
-    numero_candidatos = len(resultado_finalaux['Nome do aluno(a)'])
+    numero_candidatos_final = len(resultado_finalaux)
 
-    return resultado_final, resultado_finalaux
+    return resultado_final, resultado_finalaux, numero_candidatos_final
 
 @st.cache
 def html_fase_1_2():
@@ -4280,7 +4290,7 @@ def html_fase_1_2():
         """
         return html_card_footer3
     
-def fase_1_2_show(resultado_final, resultado_finalaux):
+def fase_1_2_show(resultado_final, resultado_finalaux, numero_candidatos_final):
 
     resultado_final_aluno = resultado_final.sort_values(by = 'Nota Final', ascending = False).reset_index(drop = True).reset_index()
     resultado_final_aluno.rename(columns = {'level_0':'Classificação'}, inplace = True)
@@ -4425,9 +4435,10 @@ def fase_1_2_show(resultado_final, resultado_finalaux):
             st.write("")  
 
 if login_aluno != '':
+
     resultados_gerais3, turma_eng, turma_cien, base, base_resultados_2fase = leitura_bases_dados()
     
-    resultados_gerais_aluno, resultados_gerais5, numero_candidatos, resultados_gerais4, alunos_fizeram, numero_eng_cien, turma_aluno, resultados_gerais_media_tempo_str, hours_aluno = fase_1(login_aluno, turma_eng, turma_cien, resultados_gerais3)
+    resultados_gerais_aluno, resultados_gerais5, numero_candidatos, resultados_gerais4, alunos_fizeram, numero_eng_cien, turma_aluno, resultados_gerais_media_tempo_str, hours_aluno, nome_aluno3 = fase_1(login_aluno, turma_eng, turma_cien, resultados_gerais3)
     
     fase_1_show(resultados_gerais_aluno, resultados_gerais5, numero_candidatos, resultados_gerais4, resultados_gerais_media_tempo_str, hours_aluno)
     
@@ -4467,7 +4478,7 @@ if login_aluno != '':
 
     red_show2(redacao_tabela3)
 
-    fotos_questao(turma_aluno, turma_eng, turma_cien)
+    fotos_questao(turma_aluno, turma_eng, turma_cien, nome_aluno3)
 
     detalhamento(base)
 
@@ -4489,11 +4500,11 @@ if login_aluno != '':
 
     arguicao_show(base_resultados_2fase_arguicao2, base_resultados_2fase_arguicao2aux, numero_candidatos_deb_arg)
 
-    resultado_final, resultado_finalaux = fase_1_2(resultados_gerais5, base_resultados_2fase, base_redacao_disciplina2)
+    resultado_final, resultado_finalaux, numero_candidatos_final = fase_1_2(resultados_gerais5, base_resultados_2fase, base_redacao_disciplina2)
 
     html_fase_1_2()
 
-    fase_1_2_show(resultado_final, resultado_finalaux)
+    fase_1_2_show(resultado_final, resultado_finalaux, numero_candidatos_final)
 
 
 
